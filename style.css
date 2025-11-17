@@ -42,6 +42,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
   margin-bottom: 24px;
   position: sticky;
   top: 0;
@@ -53,10 +55,27 @@ a {
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
 }
 
-.brand {
+.topbar-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.topbar-logo-wrap {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  border-radius: 14px;
+  background: radial-gradient(circle at 20% 20%, rgba(212, 175, 55, 0.08), rgba(15, 10, 6, 0.6));
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.topbar-logo {
+  height: 46px;
+  width: auto;
+  display: block;
 }
 
 .brand-mark {
