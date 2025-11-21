@@ -1,4 +1,5 @@
-const stateKey = "materiais-gratuitos-state-v1";
+const draftKey = "materiais-gratuitos-state-v1";
+const publishedKey = "materiais-gratuitos-public-v1";
 const submissionKey = "materiais-gratuitos-submissions-v1";
 const secret = "materiais-gratuitos-crypto-key";
 
@@ -43,10 +44,11 @@ const defaultState = {
   ],
 };
 
-let state = loadState();
+const isAdminSession = sessionStorage.getItem("isAdmin") === "true";
+let isAdmin = isAdminSession;
+let state = loadState(isAdmin);
 let selectedMaterialId = null;
 let downloadUnlocked = false;
-let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 let cryptoKeyPromise = null;
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
@@ -58,6 +60,8 @@ const downloadSuccess = document.querySelector("[data-download-success]");
 const feedback = document.querySelector("[data-form-feedback]");
 const successList = document.querySelector("[data-success-list]");
 const downloadNow = document.querySelector("[data-download-now]");
+const publishButton = document.querySelector("[data-publish-state]");
+const publishStatus = document.querySelector("[data-publish-status]");
 
 renderTexts();
 renderMaterials();
@@ -65,11 +69,15 @@ renderAdmin();
 attachEvents();
 notifyAdminState();
 
-function loadState() {
+function loadState(isAdminMode) {
+  const targetKey = isAdminMode ? draftKey : publishedKey;
+  const fallbackKey = publishedKey;
+
   try {
-    const raw = localStorage.getItem(stateKey);
-    if (!raw) return { ...defaultState };
-    const parsed = JSON.parse(raw);
+    const raw = localStorage.getItem(targetKey);
+    const fallback = !raw && fallbackKey !== targetKey ? localStorage.getItem(fallbackKey) : null;
+    const parsed = raw ? JSON.parse(raw) : fallback ? JSON.parse(fallback) : null;
+    if (!parsed) return { ...defaultState };
     return { ...defaultState, ...parsed, materials: parsed.materials || defaultState.materials };
   } catch (error) {
     console.error("Erro ao carregar estado", error);
@@ -78,7 +86,19 @@ function loadState() {
 }
 
 function saveState() {
-  localStorage.setItem(stateKey, JSON.stringify(state));
+  localStorage.setItem(draftKey, JSON.stringify(state));
+}
+
+function publishState() {
+  localStorage.setItem(publishedKey, JSON.stringify(state));
+  setPublishStatus("Conteúdo publicado com sucesso. Usuários anônimos verão esta versão.", "success");
+}
+
+function setPublishStatus(message, type = "info") {
+  if (!publishStatus) return;
+  publishStatus.textContent = message;
+  publishStatus.classList.remove("success", "error");
+  if (type !== "info") publishStatus.classList.add(type);
 }
 
 function renderTexts() {
@@ -91,6 +111,16 @@ function renderTexts() {
 function renderMaterials() {
   if (!materialsGrid) return;
   materialsGrid.innerHTML = "";
+
+  if (isAdmin) {
+    const info = document.createElement("div");
+    info.className = "materials-admin-preview";
+    info.textContent =
+      "Os cards públicos aparecem apenas para visitantes. Publique suas alterações para atualizá-los.";
+    materialsGrid.appendChild(info);
+    return;
+  }
+
   state.materials.forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
@@ -214,6 +244,7 @@ function attachEvents() {
 
   document.querySelector("[data-import-planilhas]")?.addEventListener("change", handleImport);
   document.querySelector("[data-download-submissions]")?.addEventListener("click", exportSubmissions);
+  publishButton?.addEventListener("click", publishState);
 
   document.querySelectorAll("[data-edit]").forEach((input) => {
     input.addEventListener("input", (event) => {
@@ -396,10 +427,15 @@ function readFileAsBase64(file) {
 
 function toggleAdmin(show) {
   if (!adminPanel) return;
+  if (show !== isAdmin) {
+    state = loadState(show);
+  }
   adminPanel.hidden = !show;
   adminPanel.classList.toggle("is-visible", show);
   isAdmin = show;
   renderMaterials();
+  renderTexts();
+  renderAdmin();
 }
 
 function notifyAdminState() {
