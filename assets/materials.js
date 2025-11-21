@@ -111,6 +111,11 @@ function getDisplayState() {
   return getVisitorState();
 }
 
+function getPublishedMaterials() {
+  const visitorState = getVisitorState();
+  return Array.isArray(visitorState.materials) ? visitorState.materials : [];
+}
+
 function saveState() {
   localStorage.setItem(stateKey, JSON.stringify(state));
 }
@@ -339,16 +344,36 @@ function showSuccess(payload) {
   setFeedback("Cadastro salvo com segurança.", "success");
 
   successList.innerHTML = "";
-  const currentState = getDisplayState();
-  (currentState.materials || []).forEach((material) => {
+  const publishedMaterials = getPublishedMaterials();
+
+  if (!publishedMaterials.length) {
+    const item = document.createElement("li");
+    item.textContent = "Nenhuma planilha disponível no momento.";
+    successList.appendChild(item);
+  }
+
+  publishedMaterials.forEach((material) => {
     const item = document.createElement("li");
     const link = document.createElement("a");
-    link.href = material.url;
-    link.textContent = `Baixar ${material.title}`;
+    link.href = material.url || "#";
+    link.textContent = material.title;
+    link.target = "_blank";
+    link.rel = "noopener";
     link.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (!downloadUnlocked) return;
-      triggerDownload(material.id);
+      if (!downloadUnlocked) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!material.url) {
+        event.preventDefault();
+        return;
+      }
+
+      if (shouldHandleAsDownload(material.url || "")) {
+        event.preventDefault();
+        triggerDownload(material.id);
+      }
     });
 
     item.appendChild(link);
@@ -427,8 +452,7 @@ function triggerDownload(id) {
   const currentState = getDisplayState();
   const material = (currentState.materials || []).find((item) => item.id === id) || currentState.materials?.[0];
   if (!material?.url) return;
-  const shouldDownload = material.url.startsWith("data:") || material.url.startsWith("blob:") || material.url.startsWith("/") ||
-    (!material.url.startsWith("http://") && !material.url.startsWith("https://"));
+  const shouldDownload = shouldHandleAsDownload(material.url);
 
   if (shouldDownload) {
     const link = document.createElement("a");
@@ -441,6 +465,15 @@ function triggerDownload(id) {
   }
 
   window.open(material.url, "_blank", "noopener");
+}
+
+function shouldHandleAsDownload(url) {
+  return (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("/") ||
+    (!url.startsWith("http://") && !url.startsWith("https://"))
+  );
 }
 
 function addManualMaterial() {
