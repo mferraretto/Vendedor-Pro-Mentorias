@@ -1,3 +1,7 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js";
+
 const stateKey = "materiais-gratuitos-state-v1";
 const publishedStateKey = "materiais-gratuitos-public-v1";
 const submissionKey = "materiais-gratuitos-submissions-v1";
@@ -50,6 +54,22 @@ let selectedMaterialId = null;
 let downloadUnlocked = false;
 let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 let cryptoKeyPromise = null;
+let firebaseReady = false;
+let db = null;
+let storage = null;
+
+const firebaseConfig =
+  window.FIREBASE_CONFIG ||
+  Object.freeze({
+    apiKey: "SUA_API_KEY",
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJECT_ID",
+    storageBucket: "SEU_BUCKET.appspot.com",
+    messagingSenderId: "SEU_SENDER_ID",
+    appId: "SEU_APP_ID",
+  });
+
+const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
 const heroList = document.querySelector("[data-hero-list]");
@@ -63,12 +83,38 @@ const successList = document.querySelector("[data-success-list]");
 const downloadNow = document.querySelector("[data-download-now]");
 const publishButton = document.querySelector("[data-publish-state]");
 
+initFirebaseAndSync();
+
 renderTexts();
 renderMaterials();
 renderHeroList();
 renderAdmin();
 attachEvents();
 notifyAdminState();
+
+async function initFirebaseAndSync() {
+  try {
+    const hasValidConfig = requiredKeys.every((key) => {
+      const value = firebaseConfig[key];
+      if (!value || typeof value !== "string") return false;
+      return !value.includes("SEU_") && !value.includes("SUA_");
+    });
+
+    if (!hasValidConfig) {
+      console.warn("Configuração Firebase ausente para materiais.");
+      return;
+    }
+
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    storage = getStorage(app);
+    firebaseReady = true;
+
+    await loadPublishedStateFromFirestore();
+  } catch (error) {
+    console.error("Falha ao iniciar Firebase para materiais", error);
+  }
+}
 
 function loadState() {
   try {
@@ -94,6 +140,28 @@ function loadPublicState() {
   } catch (error) {
     console.error("Erro ao carregar estado publicado", error);
     return { ...defaultState, materials: defaultState.materials };
+  }
+}
+
+async function loadPublishedStateFromFirestore() {
+  if (!firebaseReady || !db) return;
+
+  try {
+    const snapshot = await getDoc(doc(db, "materiais", "publico"));
+    if (!snapshot.exists()) return;
+
+    const data = snapshot.data();
+    publicState = {
+      ...defaultState,
+      ...data,
+      materials: Array.isArray(data?.materials) ? data.materials : defaultState.materials,
+    };
+
+    localStorage.setItem(publishedStateKey, JSON.stringify(publicState));
+    renderTexts();
+    renderMaterials();
+  } catch (error) {
+    console.error("Erro ao carregar materiais publicados do Firebase", error);
   }
 }
 
@@ -542,21 +610,46 @@ function notifyAdminState() {
 }
 
 function publishPublicState() {
-  try {
-    syncPublishedState();
-    alert("Conteúdo salvo e publicado para visitantes.");
-  } catch (error) {
+  syncPublishedState().catch((error) => {
     console.error("Erro ao publicar estado", error);
     alert("Não foi possível salvar as alterações para visitantes.");
-  }
+  });
 }
 
-function syncPublishedState() {
+async function syncPublishedState() {
   const snapshot = { ...state, materials: Array.isArray(state.materials) ? [...state.materials] : [] };
+
   localStorage.setItem(publishedStateKey, JSON.stringify(snapshot));
   publicState = loadPublicState();
   renderTexts();
   renderMaterials();
+
+  if (!firebaseReady || !db) {
+    alert("Conteúdo salvo localmente. Configure o Firebase para publicar aos visitantes.");
+    return;
+  }
+
+  const materialsWithUploads = await Promise.all(
+    (snapshot.materials || []).map(async (material) => {
+      const processed = { ...material };
+      if (storage && processed.url && shouldHandleAsDownload(processed.url) && processed.url.startsWith("data:")) {
+        try {
+          const storageRef = ref(storage, `materiais/${processed.id || Date.now()}`);
+          const uploadResult = await uploadString(storageRef, processed.url, "data_url");
+          processed.url = await getDownloadURL(uploadResult.ref);
+        } catch (error) {
+          console.error("Falha ao enviar arquivo para o Firebase Storage", error);
+        }
+      }
+      return processed;
+    })
+  );
+
+  const payload = { ...snapshot, materials: materialsWithUploads };
+  await setDoc(doc(db, "materiais", "publico"), payload);
+  publicState = payload;
+  localStorage.setItem(publishedStateKey, JSON.stringify(payload));
+  alert("Conteúdo salvo e publicado para visitantes.");
 }
 
 function startEditMaterial(id) {
