@@ -9,7 +9,38 @@ const defaultState = {
   ctaTitle: "Acesse suas planilhas exclusivas",
   ctaSubtitle:
     "Complete o pré-cadastro para receber imediatamente o acesso aos arquivos mais pedidos pelos vendedores da Shopee.",
-  materials: [],
+  materials: [
+    {
+      id: "precificacao",
+      title: "Planilha de Precificação Shopee",
+      description: "Calcule preços e margens com segurança.",
+      url: "assets/planilha-precificacao.csv",
+    },
+    {
+      id: "pedidos",
+      title: "Controle de Pedidos",
+      description: "Organize envios e entregas sem perder prazo.",
+      url: "assets/planilha-controle-pedidos.csv",
+    },
+    {
+      id: "ads",
+      title: "Shopee Ads – Registro e Análise",
+      description: "Acompanhe investimentos e resultados das campanhas.",
+      url: "assets/planilha-shopee-ads.csv",
+    },
+    {
+      id: "margem",
+      title: "Calculadora de Margem e Comissão",
+      description: "Simule comissões e margens por produto.",
+      url: "assets/planilha-margem-comissao.csv",
+    },
+    {
+      id: "seo",
+      title: "Buscador de Palavras-chave (Shopee SEO)",
+      description: "Planeje SEO para anúncios com termos de alta conversão.",
+      url: "assets/planilha-palavras-chave.csv",
+    },
+  ],
 };
 
 let state = loadState();
@@ -39,12 +70,7 @@ function loadState() {
     const raw = localStorage.getItem(stateKey);
     if (!raw) return { ...defaultState };
     const parsed = JSON.parse(raw);
-    const materials = normalizeMaterials(parsed.materials || defaultState.materials);
-    return {
-      ...defaultState,
-      ...parsed,
-      materials: materials.filter((material) => material.isAdminManaged),
-    };
+    return { ...defaultState, ...parsed, materials: parsed.materials || defaultState.materials };
   } catch (error) {
     console.error("Erro ao carregar estado", error);
     return { ...defaultState };
@@ -52,25 +78,7 @@ function loadState() {
 }
 
 function saveState() {
-  state.materials = getAdminMaterials();
   localStorage.setItem(stateKey, JSON.stringify(state));
-}
-
-function normalizeMaterials(materials = []) {
-  return (materials || []).map((material) => {
-    const description = material.description?.toLowerCase() || "";
-    const isAdminManaged =
-      material.isAdminManaged ||
-      material.source === "admin" ||
-      material.url?.toString().startsWith("data:") ||
-      description.includes("importada");
-
-    return { ...material, isAdminManaged: Boolean(isAdminManaged) };
-  });
-}
-
-function getAdminMaterials() {
-  return (state.materials || []).filter((item) => item.isAdminManaged);
 }
 
 function renderTexts() {
@@ -83,16 +91,7 @@ function renderTexts() {
 function renderMaterials() {
   if (!materialsGrid) return;
   materialsGrid.innerHTML = "";
-  const materials = getAdminMaterials();
-  if (!materials.length) {
-    const empty = document.createElement("p");
-    empty.className = "materials-empty";
-    empty.textContent = "Nenhuma planilha disponível. Faça login como administrador para importar.";
-    materialsGrid.appendChild(empty);
-    return;
-  }
-
-  materials.forEach((material) => {
+  state.materials.forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
     const adminBar = isAdmin
@@ -123,7 +122,7 @@ function renderMaterials() {
 function renderAdmin() {
   if (!adminMaterials) return;
   adminMaterials.innerHTML = "";
-  getAdminMaterials().forEach((material) => {
+  state.materials.forEach((material) => {
     const wrapper = document.createElement("div");
     wrapper.className = "admin-material-row";
     wrapper.innerHTML = `
@@ -280,15 +279,7 @@ function showSuccess(payload) {
   setFeedback("Cadastro salvo com segurança.", "success");
 
   successList.innerHTML = "";
-  const materials = getAdminMaterials();
-  if (!materials.length) {
-    const item = document.createElement("li");
-    item.textContent = "Nenhuma planilha importada no momento.";
-    successList.appendChild(item);
-    return;
-  }
-
-  materials.forEach((material) => {
+  state.materials.forEach((material) => {
     const item = document.createElement("li");
     item.textContent = material.title;
     successList.appendChild(item);
@@ -363,8 +354,7 @@ async function exportSubmissions() {
 }
 
 function triggerDownload(id) {
-  const materials = getAdminMaterials();
-  const material = materials.find((item) => item.id === id) || materials[0];
+  const material = state.materials.find((item) => item.id === id) || state.materials[0];
   if (!material?.url) return;
   const link = document.createElement("a");
   link.href = material.url;
@@ -386,7 +376,6 @@ async function handleImport(event) {
       title: file.name,
       description: "Planilha importada pelo administrador.",
       url: base64,
-      isAdminManaged: true,
     });
   }
 
