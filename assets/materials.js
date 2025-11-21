@@ -428,6 +428,7 @@ function showSuccess(payload) {
     link.textContent = material.title;
     link.target = "_blank";
     link.rel = "noopener";
+    link.className = "success-link";
     link.addEventListener("click", (event) => {
       if (!downloadUnlocked) {
         event.preventDefault();
