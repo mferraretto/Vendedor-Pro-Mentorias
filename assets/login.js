@@ -120,12 +120,9 @@ loginForm?.addEventListener("submit", async (event) => {
 
     if (isAdmin) {
       setStatus("Acesso liberado. Perfil administrador confirmado.", "success");
-      setAdminSession(true, user.email);
-      toggleModal(false);
     } else {
       await signOut(auth);
       setStatus("Seu usuário não possui perfil ADM nesta área.", "error");
-      setAdminSession(false);
     }
   } catch (error) {
     console.error(error);
@@ -138,25 +135,6 @@ loginForm?.addEventListener("submit", async (event) => {
     if (submitButton) submitButton.disabled = false;
   }
 });
-
-function setAdminSession(isAdmin, email = "") {
-  if (isAdmin) {
-    sessionStorage.setItem("isAdmin", "true");
-  } else {
-    sessionStorage.removeItem("isAdmin");
-  }
-
-  const event = new CustomEvent("admin-auth-changed", {
-    detail: { isAdmin, email },
-  });
-  document.dispatchEvent(event);
-}
-
-if (sessionStorage.getItem("isAdmin") === "true") {
-  document.dispatchEvent(
-    new CustomEvent("admin-auth-changed", { detail: { isAdmin: true } })
-  );
-}
 
 async function validateAdmin(user) {
   if (!user?.email) return false;
