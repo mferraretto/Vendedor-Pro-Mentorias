@@ -19,13 +19,21 @@
           <small>Modalidade 2 · Gestão Total</small>
         </div>
       </div>
-      <nav class="top-links">
-        <a href="sobre-mim.html" class="top-link">Sobre mim</a>
-        <a href="index.html" class="top-link">Voltar à visão geral</a>
-        <a href="gestao-estrategica.html" class="top-link">Gestão Estratégica</a>
-        <a href="mentoria-crescimento.html" class="top-link">Mentoria</a>
-        <a href="ia-ecommerce.html" class="top-link">IA para E-commerce</a>
-      </nav>
+      <div class="topbar-actions">
+        <nav class="top-links">
+          <a href="sobre-mim.html" class="top-link">Sobre mim</a>
+          <a href="index.html" class="top-link">Voltar à visão geral</a>
+          <a href="gestao-estrategica.html" class="top-link">Gestão Estratégica</a>
+          <a href="mentoria-crescimento.html" class="top-link">Mentoria</a>
+          <a href="ia-ecommerce.html" class="top-link">IA para E-commerce</a>
+        </nav>
+        <button class="login-icon" type="button" aria-haspopup="dialog" aria-controls="login-modal" title="Área restrita" data-login-trigger>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="7" r="4" />
+            <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <section class="hero">
@@ -374,5 +382,36 @@ Também é possível combinar um valor fixo mínimo + percentual para garantir s
       Gestão Shopee Premium · Modalidade 2 · Gestão Total (Full Management).
     </footer>
   </div>
+
+  <div class="login-modal" data-login-modal aria-hidden="true" id="login-modal">
+    <div class="login-modal-card" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+      <button type="button" class="login-close" aria-label="Fechar modal de login" data-login-close>×</button>
+      <div class="login-modal-header">
+        <div class="login-badge">Acesso restrito</div>
+        <div>
+          <h3 id="login-modal-title">Entrar como administrador</h3>
+          <p>Faça login para acessar os controles internos.</p>
+        </div>
+      </div>
+      <form class="login-form" data-login-form>
+        <div class="login-field">
+          <label class="login-label" for="login-email">Email</label>
+          <input type="email" class="login-input" id="login-email" name="email" placeholder="seu-email@dominio.com" required />
+        </div>
+        <div class="login-field">
+          <label class="login-label" for="login-password">Senha</label>
+          <input type="password" class="login-input" id="login-password" name="password" placeholder="••••••••" required />
+        </div>
+        <div class="login-actions">
+          <button type="button" class="btn-ghost-small" data-login-close>Fechar</button>
+          <button type="submit" class="btn-primary small">Entrar</button>
+        </div>
+        <p class="login-feedback" data-login-feedback>Use seu usuário administrador cadastrado.</p>
+        <p class="login-note">Apenas o proprietário tem acesso autorizado.</p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="assets/login.js"></script>
 </body>
 </html>
