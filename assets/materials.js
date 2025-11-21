@@ -90,18 +90,25 @@ function loadPublicState() {
       return { ...defaultState, ...parsed, materials: parsed.materials || defaultState.materials };
     }
 
-    return { ...defaultState, ...state, materials: state.materials || defaultState.materials };
+    return { ...defaultState, materials: defaultState.materials };
   } catch (error) {
     console.error("Erro ao carregar estado publicado", error);
     return { ...defaultState, materials: defaultState.materials };
   }
 }
 
+function getVisitorState() {
+  const hasPublished = Array.isArray(publicState?.materials) && publicState.materials.length > 0;
+  if (hasPublished) {
+    return { ...defaultState, ...publicState, materials: publicState.materials || defaultState.materials };
+  }
+
+  return { ...defaultState, materials: defaultState.materials };
+}
+
 function getDisplayState() {
   if (isAdmin) return state;
-  const hasPublished = Array.isArray(publicState?.materials) && publicState.materials.length > 0;
-  if (hasPublished) return publicState;
-  return { ...defaultState, ...state, materials: state.materials || defaultState.materials };
+  return getVisitorState();
 }
 
 function saveState() {
@@ -266,6 +273,7 @@ function attachEvents() {
   document.querySelector("[data-import-planilhas]")?.addEventListener("change", handleImport);
   document.querySelector("[data-download-submissions]")?.addEventListener("click", exportSubmissions);
   publishButton?.addEventListener("click", publishPublicState);
+  document.querySelector("[data-add-material]")?.addEventListener("click", addManualMaterial);
 
   document.querySelectorAll("[data-edit]").forEach((input) => {
     input.addEventListener("input", (event) => {
@@ -433,6 +441,20 @@ function triggerDownload(id) {
   }
 
   window.open(material.url, "_blank", "noopener");
+}
+
+function addManualMaterial() {
+  const id = `material-${Date.now()}`;
+  state.materials.push({
+    id,
+    title: "Nova planilha",
+    description: "Descrição da planilha ou material.",
+    url: "",
+  });
+
+  saveState();
+  renderMaterials();
+  renderAdmin();
 }
 
 async function handleImport(event) {
