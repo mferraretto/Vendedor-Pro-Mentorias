@@ -1,0 +1,3 @@
+Pedido;Cliente;Data;Status;Valor
+#1234;Fulano;2024-05-12;Aguardando envio;149,90
+#1235;Ciclana;2024-05-12;Enviado;89,90
