@@ -55,6 +55,7 @@ const materialsGrid = document.querySelector("[data-materials-grid]");
 const heroList = document.querySelector("[data-hero-list]");
 const adminPanel = document.querySelector("[data-admin-panel]");
 const adminMaterials = document.querySelector("[data-admin-materials]");
+const addMaterialButton = document.querySelector("[data-add-material]");
 const downloadModal = document.querySelector("[data-download-modal]");
 const downloadForm = document.querySelector("[data-download-form]");
 const downloadSuccess = document.querySelector("[data-download-success]");
@@ -100,8 +101,14 @@ function loadPublicState() {
 function getDisplayState() {
   if (isAdmin) return state;
   const hasPublished = Array.isArray(publicState?.materials) && publicState.materials.length > 0;
-  if (hasPublished) return publicState;
-  return { ...defaultState, ...state, materials: state.materials || defaultState.materials };
+  if (hasPublished) return { ...defaultState, ...publicState, materials: publicState.materials };
+  return { ...defaultState, materials: defaultState.materials };
+}
+
+function getDisplayMaterials() {
+  if (isAdmin) return state.materials || [];
+  if (Array.isArray(publicState?.materials) && publicState.materials.length) return publicState.materials;
+  return defaultState.materials || [];
 }
 
 function saveState() {
@@ -119,8 +126,8 @@ function renderTexts() {
 function renderMaterials() {
   if (!materialsGrid) return;
   materialsGrid.innerHTML = "";
-  const currentState = getDisplayState();
-  (currentState.materials || []).forEach((material) => {
+  const materials = getDisplayMaterials();
+  materials.forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
     const adminBar = isAdmin
@@ -153,8 +160,7 @@ function renderMaterials() {
 function renderHeroList() {
   if (!heroList) return;
   heroList.innerHTML = "";
-  const currentState = getDisplayState();
-  const materials = currentState.materials || [];
+  const materials = getDisplayMaterials();
 
   if (!materials.length) {
     const emptyItem = document.createElement("li");
@@ -173,6 +179,14 @@ function renderHeroList() {
 function renderAdmin() {
   if (!adminMaterials) return;
   adminMaterials.innerHTML = "";
+  if (!state.materials.length) {
+    const empty = document.createElement("p");
+    empty.className = "admin-empty";
+    empty.textContent = "Nenhuma planilha adicionada. Importe ou crie manualmente.";
+    adminMaterials.appendChild(empty);
+    return;
+  }
+
   state.materials.forEach((material) => {
     const wrapper = document.createElement("div");
     wrapper.className = "admin-material-row";
@@ -266,6 +280,7 @@ function attachEvents() {
   document.querySelector("[data-import-planilhas]")?.addEventListener("change", handleImport);
   document.querySelector("[data-download-submissions]")?.addEventListener("click", exportSubmissions);
   publishButton?.addEventListener("click", publishPublicState);
+  addMaterialButton?.addEventListener("click", addEmptyMaterial);
 
   document.querySelectorAll("[data-edit]").forEach((input) => {
     input.addEventListener("input", (event) => {
@@ -331,8 +346,8 @@ function showSuccess(payload) {
   setFeedback("Cadastro salvo com segurança.", "success");
 
   successList.innerHTML = "";
-  const currentState = getDisplayState();
-  (currentState.materials || []).forEach((material) => {
+  const materials = getDisplayMaterials();
+  materials.forEach((material) => {
     const item = document.createElement("li");
     const link = document.createElement("a");
     link.href = material.url;
@@ -416,8 +431,8 @@ async function exportSubmissions() {
 }
 
 function triggerDownload(id) {
-  const currentState = getDisplayState();
-  const material = (currentState.materials || []).find((item) => item.id === id) || currentState.materials?.[0];
+  const materials = getDisplayMaterials();
+  const material = materials.find((item) => item.id === id) || materials[0];
   if (!material?.url) return;
   const shouldDownload = material.url.startsWith("data:") || material.url.startsWith("blob:") || material.url.startsWith("/") ||
     (!material.url.startsWith("http://") && !material.url.startsWith("https://"));
@@ -513,6 +528,19 @@ function startEditMaterial(id) {
   material.description = description.trim() || material.description;
   material.url = url.trim() || material.url;
 
+  saveState();
+  renderMaterials();
+  renderAdmin();
+}
+
+function addEmptyMaterial() {
+  const id = `manual-${Date.now()}`;
+  state.materials.push({
+    id,
+    title: "Nova planilha",
+    description: "Adicione uma descrição e um link direto para download.",
+    url: "",
+  });
   saveState();
   renderMaterials();
   renderAdmin();
