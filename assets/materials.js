@@ -9,41 +9,10 @@ const defaultState = {
   ctaTitle: "Acesse suas planilhas exclusivas",
   ctaSubtitle:
     "Complete o pré-cadastro para receber imediatamente o acesso aos arquivos mais pedidos pelos vendedores da Shopee.",
-  materials: [
-    {
-      id: "precificacao",
-      title: "Planilha de Precificação Shopee",
-      description: "Calcule preços e margens com segurança.",
-      url: "assets/planilha-precificacao.csv",
-    },
-    {
-      id: "pedidos",
-      title: "Controle de Pedidos",
-      description: "Organize envios e entregas sem perder prazo.",
-      url: "assets/planilha-controle-pedidos.csv",
-    },
-    {
-      id: "ads",
-      title: "Shopee Ads – Registro e Análise",
-      description: "Acompanhe investimentos e resultados das campanhas.",
-      url: "assets/planilha-shopee-ads.csv",
-    },
-    {
-      id: "margem",
-      title: "Calculadora de Margem e Comissão",
-      description: "Simule comissões e margens por produto.",
-      url: "assets/planilha-margem-comissao.csv",
-    },
-    {
-      id: "seo",
-      title: "Buscador de Palavras-chave (Shopee SEO)",
-      description: "Planeje SEO para anúncios com termos de alta conversão.",
-      url: "assets/planilha-palavras-chave.csv",
-    },
-  ],
+  materials: [],
 };
 
-let state = loadState();
+let state = sanitizeState(loadState());
 let selectedMaterialId = null;
 let downloadUnlocked = false;
 let isAdmin = sessionStorage.getItem("isAdmin") === "true";
@@ -78,7 +47,20 @@ function loadState() {
 }
 
 function saveState() {
+  state = sanitizeState(state);
   localStorage.setItem(stateKey, JSON.stringify(state));
+}
+
+function sanitizeState(currentState) {
+  return { ...currentState, materials: sanitizeMaterials(currentState.materials) };
+}
+
+function sanitizeMaterials(materials = []) {
+  return materials.filter((material) => isImportedMaterial(material));
+}
+
+function isImportedMaterial(material = {}) {
+  return !!(material.isImported || material.url?.startsWith("data:"));
 }
 
 function renderTexts() {
@@ -91,7 +73,17 @@ function renderTexts() {
 function renderMaterials() {
   if (!materialsGrid) return;
   materialsGrid.innerHTML = "";
-  state.materials.forEach((material) => {
+  const materials = sanitizeMaterials(state.materials);
+
+  if (!materials.length) {
+    const emptyState = document.createElement("p");
+    emptyState.className = "materials-empty";
+    emptyState.textContent = "Nenhuma planilha disponível no momento. Aguarde o administrador liberar novos arquivos.";
+    materialsGrid.appendChild(emptyState);
+    return;
+  }
+
+  materials.forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
     const adminBar = isAdmin
@@ -122,7 +114,7 @@ function renderMaterials() {
 function renderAdmin() {
   if (!adminMaterials) return;
   adminMaterials.innerHTML = "";
-  state.materials.forEach((material) => {
+  sanitizeMaterials(state.materials).forEach((material) => {
     const wrapper = document.createElement("div");
     wrapper.className = "admin-material-row";
     wrapper.innerHTML = `
@@ -279,7 +271,7 @@ function showSuccess(payload) {
   setFeedback("Cadastro salvo com segurança.", "success");
 
   successList.innerHTML = "";
-  state.materials.forEach((material) => {
+  sanitizeMaterials(state.materials).forEach((material) => {
     const item = document.createElement("li");
     item.textContent = material.title;
     successList.appendChild(item);
@@ -354,7 +346,8 @@ async function exportSubmissions() {
 }
 
 function triggerDownload(id) {
-  const material = state.materials.find((item) => item.id === id) || state.materials[0];
+  const materials = sanitizeMaterials(state.materials);
+  const material = materials.find((item) => item.id === id) || materials[0];
   if (!material?.url) return;
   const link = document.createElement("a");
   link.href = material.url;
@@ -376,6 +369,7 @@ async function handleImport(event) {
       title: file.name,
       description: "Planilha importada pelo administrador.",
       url: base64,
+      isImported: true,
     });
   }
 
