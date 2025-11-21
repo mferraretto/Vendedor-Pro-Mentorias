@@ -3,6 +3,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signOut,
+  onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 import {
   getFirestore,
@@ -50,10 +51,12 @@ if (hasValidConfig) {
   auth = getAuth(app);
   db = getFirestore(app);
   isReady = true;
+  setupAuthListener();
 } else {
   console.warn(
     "Configuração do Firebase ausente. Defina window.FIREBASE_CONFIG com apiKey, authDomain, projectId e appId para habilitar o login."
   );
+  setAdminSession(false);
 }
 
 function setStatus(message, type = "info") {
@@ -150,6 +153,22 @@ function setAdminSession(isAdmin, email = "") {
     detail: { isAdmin, email },
   });
   document.dispatchEvent(event);
+}
+
+function setupAuthListener() {
+  if (!auth || !db) return;
+
+  setAdminSession(false);
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      setAdminSession(false);
+      return;
+    }
+
+    const isAdmin = await validateAdmin(user);
+    setAdminSession(isAdmin, user.email);
+  });
 }
 
 if (sessionStorage.getItem("isAdmin") === "true") {
