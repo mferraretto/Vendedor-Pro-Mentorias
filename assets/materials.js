@@ -1,7 +1,13 @@
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
 const stateKey = "materiais-gratuitos-state-v1";
 const publishedStateKey = "materiais-gratuitos-public-v1";
 const submissionKey = "materiais-gratuitos-submissions-v1";
 const secret = "materiais-gratuitos-crypto-key";
+const firebaseConfig = window.FIREBASE_CONFIG;
+const requiredKeys = ["apiKey", "authDomain", "projectId", "appId"];
+const hasFirebaseConfig = requiredKeys.every((key) => firebaseConfig?.[key]);
 
 const defaultState = {
   heroTitle: "Acesse Suas Planilhas Gratuitas Para Vender Mais na Shopee",
@@ -50,6 +56,8 @@ let selectedMaterialId = null;
 let downloadUnlocked = false;
 let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 let cryptoKeyPromise = null;
+let firestoreDb = null;
+let publishedDocRef = null;
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
 const heroList = document.querySelector("[data-hero-list]");
@@ -62,6 +70,8 @@ const feedback = document.querySelector("[data-form-feedback]");
 const successList = document.querySelector("[data-success-list]");
 const downloadNow = document.querySelector("[data-download-now]");
 const publishButton = document.querySelector("[data-publish-state]");
+
+initFirebase();
 
 renderTexts();
 renderMaterials();
@@ -97,6 +107,23 @@ function loadPublicState() {
   }
 }
 
+function initFirebase() {
+  if (!hasFirebaseConfig) {
+    console.warn("Firebase não configurado para materiais. Defina window.FIREBASE_CONFIG.");
+    return;
+  }
+
+  try {
+    const existingApp = getApps()[0];
+    const app = existingApp || initializeApp(firebaseConfig);
+    firestoreDb = getFirestore(app);
+    publishedDocRef = doc(firestoreDb, "materiais", "publicado");
+    refreshPublicStateFromCloud();
+  } catch (error) {
+    console.error("Erro ao iniciar Firebase para materiais", error);
+  }
+}
+
 function getVisitorState() {
   const hasPublished = Array.isArray(publicState?.materials) && publicState.materials.length > 0;
   if (hasPublished) {
@@ -119,6 +146,43 @@ function getDisplayState() {
 function getPublishedMaterials() {
   const visitorState = getVisitorState();
   return Array.isArray(visitorState.materials) ? visitorState.materials : [];
+}
+
+async function refreshPublicStateFromCloud() {
+  if (!publishedDocRef) return;
+
+  try {
+    const snapshot = await getDoc(publishedDocRef);
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      const safeState = {
+        ...defaultState,
+        ...data,
+        materials: Array.isArray(data?.materials) ? data.materials : defaultState.materials,
+      };
+
+      localStorage.setItem(publishedStateKey, JSON.stringify(safeState));
+      publicState = safeState;
+      renderTexts();
+      renderMaterials();
+      renderHeroList();
+    }
+  } catch (error) {
+    console.error("Erro ao carregar materiais do Firebase", error);
+  }
+}
+
+async function savePublicStateToCloud(snapshot) {
+  if (!publishedDocRef) return;
+
+  const payload = {
+    ...defaultState,
+    ...snapshot,
+    materials: Array.isArray(snapshot.materials) ? snapshot.materials : [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  await setDoc(publishedDocRef, payload);
 }
 
 function saveState() {
@@ -541,9 +605,10 @@ function notifyAdminState() {
   toggleAdmin(stored);
 }
 
-function publishPublicState() {
+async function publishPublicState() {
   try {
-    syncPublishedState();
+    const snapshot = syncPublishedState();
+    await savePublicStateToCloud(snapshot);
     alert("Conteúdo salvo e publicado para visitantes.");
   } catch (error) {
     console.error("Erro ao publicar estado", error);
@@ -557,6 +622,7 @@ function syncPublishedState() {
   publicState = loadPublicState();
   renderTexts();
   renderMaterials();
+  return snapshot;
 }
 
 function startEditMaterial(id) {
