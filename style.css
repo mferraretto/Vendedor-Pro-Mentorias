@@ -581,7 +581,8 @@ footer {
   pointer-events: none;
   transition: opacity 0.18s ease;
   z-index: 999;
-  padding: 16px;
+  padding: 24px 14px;
+  overflow-y: auto;
 }
 
 .login-modal.is-visible {
@@ -597,6 +598,7 @@ footer {
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65);
   padding: 22px 20px 18px;
+  margin: auto;
 }
 
 .login-modal-header {
@@ -1192,6 +1194,7 @@ body.modal-open {
   pointer-events: none;
   transition: opacity 0.2s ease;
   z-index: 50;
+  overflow-y: auto;
 }
 
 .download-modal.is-visible {
@@ -1208,6 +1211,8 @@ body.modal-open {
   width: 100%;
   position: relative;
   box-shadow: 0 26px 70px rgba(0, 0, 0, 0.65);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
 }
 
 .download-card-header {
