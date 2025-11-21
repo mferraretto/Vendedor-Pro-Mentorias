@@ -1,4 +1,5 @@
 const stateKey = "materiais-gratuitos-state-v1";
+const publishedStateKey = "materiais-gratuitos-public-v1";
 const submissionKey = "materiais-gratuitos-submissions-v1";
 const secret = "materiais-gratuitos-crypto-key";
 
@@ -44,6 +45,7 @@ const defaultState = {
 };
 
 let state = loadState();
+let publicState = loadPublicState();
 let selectedMaterialId = null;
 let downloadUnlocked = false;
 let isAdmin = sessionStorage.getItem("isAdmin") === "true";
@@ -58,6 +60,7 @@ const downloadSuccess = document.querySelector("[data-download-success]");
 const feedback = document.querySelector("[data-form-feedback]");
 const successList = document.querySelector("[data-success-list]");
 const downloadNow = document.querySelector("[data-download-now]");
+const publishButton = document.querySelector("[data-publish-state]");
 
 renderTexts();
 renderMaterials();
@@ -77,21 +80,39 @@ function loadState() {
   }
 }
 
+function loadPublicState() {
+  try {
+    const raw = localStorage.getItem(publishedStateKey);
+    if (!raw) return { ...defaultState, materials: [] };
+    const parsed = JSON.parse(raw);
+    return { ...defaultState, ...parsed, materials: parsed.materials || [] };
+  } catch (error) {
+    console.error("Erro ao carregar estado publicado", error);
+    return { ...defaultState, materials: [] };
+  }
+}
+
+function getDisplayState() {
+  return isAdmin ? state : publicState;
+}
+
 function saveState() {
   localStorage.setItem(stateKey, JSON.stringify(state));
 }
 
 function renderTexts() {
-  document.querySelectorAll("[data-bind='heroTitle']").forEach((el) => (el.textContent = state.heroTitle));
-  document.querySelectorAll("[data-bind='heroSubtitle']").forEach((el) => (el.textContent = state.heroSubtitle));
-  document.querySelectorAll("[data-bind='ctaTitle']").forEach((el) => (el.textContent = state.ctaTitle));
-  document.querySelectorAll("[data-bind='ctaSubtitle']").forEach((el) => (el.textContent = state.ctaSubtitle));
+  const currentState = getDisplayState();
+  document.querySelectorAll("[data-bind='heroTitle']").forEach((el) => (el.textContent = currentState.heroTitle));
+  document.querySelectorAll("[data-bind='heroSubtitle']").forEach((el) => (el.textContent = currentState.heroSubtitle));
+  document.querySelectorAll("[data-bind='ctaTitle']").forEach((el) => (el.textContent = currentState.ctaTitle));
+  document.querySelectorAll("[data-bind='ctaSubtitle']").forEach((el) => (el.textContent = currentState.ctaSubtitle));
 }
 
 function renderMaterials() {
   if (!materialsGrid) return;
   materialsGrid.innerHTML = "";
-  state.materials.forEach((material) => {
+  const currentState = getDisplayState();
+  (currentState.materials || []).forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
     const adminBar = isAdmin
@@ -214,6 +235,7 @@ function attachEvents() {
 
   document.querySelector("[data-import-planilhas]")?.addEventListener("change", handleImport);
   document.querySelector("[data-download-submissions]")?.addEventListener("click", exportSubmissions);
+  publishButton?.addEventListener("click", publishPublicState);
 
   document.querySelectorAll("[data-edit]").forEach((input) => {
     input.addEventListener("input", (event) => {
@@ -279,7 +301,8 @@ function showSuccess(payload) {
   setFeedback("Cadastro salvo com segurança.", "success");
 
   successList.innerHTML = "";
-  state.materials.forEach((material) => {
+  const currentState = getDisplayState();
+  (currentState.materials || []).forEach((material) => {
     const item = document.createElement("li");
     item.textContent = material.title;
     successList.appendChild(item);
@@ -354,7 +377,8 @@ async function exportSubmissions() {
 }
 
 function triggerDownload(id) {
-  const material = state.materials.find((item) => item.id === id) || state.materials[0];
+  const currentState = getDisplayState();
+  const material = (currentState.materials || []).find((item) => item.id === id) || currentState.materials?.[0];
   if (!material?.url) return;
   const link = document.createElement("a");
   link.href = material.url;
@@ -399,12 +423,30 @@ function toggleAdmin(show) {
   adminPanel.hidden = !show;
   adminPanel.classList.toggle("is-visible", show);
   isAdmin = show;
+  if (!show) {
+    publicState = loadPublicState();
+  }
+  renderTexts();
   renderMaterials();
+  renderAdmin();
 }
 
 function notifyAdminState() {
   const stored = sessionStorage.getItem("isAdmin") === "true";
   toggleAdmin(stored);
+}
+
+function publishPublicState() {
+  try {
+    localStorage.setItem(publishedStateKey, JSON.stringify(state));
+    publicState = loadPublicState();
+    renderTexts();
+    renderMaterials();
+    alert("Conteúdo salvo e publicado para visitantes.");
+  } catch (error) {
+    console.error("Erro ao publicar estado", error);
+    alert("Não foi possível salvar as alterações para visitantes.");
+  }
 }
 
 function startEditMaterial(id) {
