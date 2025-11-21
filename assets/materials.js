@@ -270,9 +270,8 @@ function attachEvents() {
   });
 
   downloadNow?.addEventListener("click", () => {
-    if (downloadUnlocked) {
-      triggerDownload(selectedMaterialId);
-    }
+    if (!downloadUnlocked) return;
+    successList?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.querySelector("[data-import-planilhas]")?.addEventListener("change", handleImport);
@@ -379,8 +378,6 @@ function showSuccess(payload) {
     item.appendChild(link);
     successList.appendChild(item);
   });
-
-  triggerDownload(selectedMaterialId);
 }
 
 async function saveEncryptedSubmission(payload) {
