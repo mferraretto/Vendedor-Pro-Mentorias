@@ -426,7 +426,6 @@ function showSuccess(payload) {
     const link = document.createElement("a");
     link.href = material.url || "#";
     link.textContent = material.title;
-    link.className = "success-link";
     link.target = "_blank";
     link.rel = "noopener";
     link.addEventListener("click", (event) => {
