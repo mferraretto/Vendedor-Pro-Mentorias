@@ -103,6 +103,11 @@ function getVisitorState() {
     return { ...defaultState, ...publicState, materials: publicState.materials || defaultState.materials };
   }
 
+  const localDraftMaterials = Array.isArray(state?.materials) && state.materials.length > 0;
+  if (localDraftMaterials) {
+    return { ...defaultState, ...state, materials: state.materials };
+  }
+
   return { ...defaultState, materials: defaultState.materials };
 }
 
@@ -118,6 +123,7 @@ function getPublishedMaterials() {
 
 function saveState() {
   localStorage.setItem(stateKey, JSON.stringify(state));
+  syncPublishedState();
 }
 
 function renderTexts() {
@@ -537,15 +543,20 @@ function notifyAdminState() {
 
 function publishPublicState() {
   try {
-    localStorage.setItem(publishedStateKey, JSON.stringify(state));
-    publicState = loadPublicState();
-    renderTexts();
-    renderMaterials();
+    syncPublishedState();
     alert("Conteúdo salvo e publicado para visitantes.");
   } catch (error) {
     console.error("Erro ao publicar estado", error);
     alert("Não foi possível salvar as alterações para visitantes.");
   }
+}
+
+function syncPublishedState() {
+  const snapshot = { ...state, materials: Array.isArray(state.materials) ? [...state.materials] : [] };
+  localStorage.setItem(publishedStateKey, JSON.stringify(snapshot));
+  publicState = loadPublicState();
+  renderTexts();
+  renderMaterials();
 }
 
 function startEditMaterial(id) {
