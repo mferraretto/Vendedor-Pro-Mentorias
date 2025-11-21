@@ -47,6 +47,7 @@ let state = loadState();
 let selectedMaterialId = null;
 let downloadUnlocked = false;
 let isAdmin = sessionStorage.getItem("isAdmin") === "true";
+let cryptoKeyPromise = null;
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
 const adminPanel = document.querySelector("[data-admin-panel]");
@@ -444,7 +445,7 @@ function removeMaterial(id) {
 async function encrypt(data) {
   const encoder = new TextEncoder();
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), "AES-GCM", false, ["encrypt"]);
+  const key = await getCryptoKey();
   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(data)));
   return {
     iv: arrayBufferToBase64(iv),
@@ -453,12 +454,27 @@ async function encrypt(data) {
 }
 
 async function decrypt(payload) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), "AES-GCM", false, ["decrypt"]);
+  const key = await getCryptoKey();
   const iv = base64ToArrayBuffer(payload.iv);
   const data = base64ToArrayBuffer(payload.data);
   const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, data);
   return JSON.parse(new TextDecoder().decode(decrypted));
+}
+
+async function getCryptoKey() {
+  if (!cryptoKeyPromise) {
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.digest("SHA-256", encoder.encode(secret));
+    cryptoKeyPromise = crypto.subtle.importKey(
+      "raw",
+      keyMaterial,
+      { name: "AES-GCM" },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  return cryptoKeyPromise;
 }
 
 function arrayBufferToBase64(buffer) {
