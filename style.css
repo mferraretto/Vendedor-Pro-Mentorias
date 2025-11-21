@@ -1043,16 +1043,6 @@ body.modal-open {
   gap: 12px;
 }
 
-.materials-empty {
-  margin: 0;
-  padding: 14px;
-  border: 1px dashed rgba(212, 175, 55, 0.3);
-  border-radius: 12px;
-  color: var(--muted);
-  background: rgba(12, 12, 18, 0.6);
-  font-size: 14px;
-}
-
 .material-card {
   padding: 16px;
   background: var(--card);
