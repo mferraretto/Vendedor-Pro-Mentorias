@@ -52,6 +52,7 @@ let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 let cryptoKeyPromise = null;
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
+const heroList = document.querySelector("[data-hero-list]");
 const adminPanel = document.querySelector("[data-admin-panel]");
 const adminMaterials = document.querySelector("[data-admin-materials]");
 const downloadModal = document.querySelector("[data-download-modal]");
@@ -64,6 +65,7 @@ const publishButton = document.querySelector("[data-publish-state]");
 
 renderTexts();
 renderMaterials();
+renderHeroList();
 renderAdmin();
 attachEvents();
 notifyAdminState();
@@ -143,6 +145,28 @@ function renderMaterials() {
       </div>
     `;
     materialsGrid.appendChild(card);
+  });
+
+  renderHeroList();
+}
+
+function renderHeroList() {
+  if (!heroList) return;
+  heroList.innerHTML = "";
+  const currentState = getDisplayState();
+  const materials = currentState.materials || [];
+
+  if (!materials.length) {
+    const emptyItem = document.createElement("li");
+    emptyItem.textContent = "Nenhuma planilha disponível no momento.";
+    heroList.appendChild(emptyItem);
+    return;
+  }
+
+  materials.forEach((material) => {
+    const item = document.createElement("li");
+    item.textContent = material.title;
+    heroList.appendChild(item);
   });
 }
 
@@ -395,12 +419,20 @@ function triggerDownload(id) {
   const currentState = getDisplayState();
   const material = (currentState.materials || []).find((item) => item.id === id) || currentState.materials?.[0];
   if (!material?.url) return;
-  const link = document.createElement("a");
-  link.href = material.url;
-  link.download = material.title.replace(/\s+/g, "-").toLowerCase();
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  const shouldDownload = material.url.startsWith("data:") || material.url.startsWith("blob:") || material.url.startsWith("/") ||
+    (!material.url.startsWith("http://") && !material.url.startsWith("https://"));
+
+  if (shouldDownload) {
+    const link = document.createElement("a");
+    link.href = material.url;
+    link.download = material.title.replace(/\s+/g, "-").toLowerCase();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return;
+  }
+
+  window.open(material.url, "_blank", "noopener");
 }
 
 async function handleImport(event) {
