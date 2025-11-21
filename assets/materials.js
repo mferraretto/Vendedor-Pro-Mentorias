@@ -83,12 +83,16 @@ function loadState() {
 function loadPublicState() {
   try {
     const raw = localStorage.getItem(publishedStateKey);
-    if (!raw) return { ...defaultState, materials: [] };
-    const parsed = JSON.parse(raw);
-    return { ...defaultState, ...parsed, materials: parsed.materials || [] };
+    const parsed = raw ? JSON.parse(raw) : null;
+    const fallback = parsed || state || defaultState;
+    return {
+      ...defaultState,
+      ...fallback,
+      materials: (fallback.materials && fallback.materials.length ? fallback.materials : defaultState.materials) || [],
+    };
   } catch (error) {
     console.error("Erro ao carregar estado publicado", error);
-    return { ...defaultState, materials: [] };
+    return { ...defaultState };
   }
 }
 
