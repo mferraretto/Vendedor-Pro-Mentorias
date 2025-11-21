@@ -1,5 +1,16 @@
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  addDoc,
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
 const stateKey = "materiais-gratuitos-state-v1";
 const publishedStateKey = "materiais-gratuitos-public-v1";
@@ -58,6 +69,7 @@ let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 let cryptoKeyPromise = null;
 let firestoreDb = null;
 let publishedDocRef = null;
+let submissionsCollection = null;
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
 const heroList = document.querySelector("[data-hero-list]");
@@ -118,6 +130,7 @@ function initFirebase() {
     const app = existingApp || initializeApp(firebaseConfig);
     firestoreDb = getFirestore(app);
     publishedDocRef = doc(firestoreDb, "materiais", "publicado");
+    submissionsCollection = collection(firestoreDb, "materiais_submissoes");
     refreshPublicStateFromCloud();
   } catch (error) {
     console.error("Erro ao iniciar Firebase para materiais", error);
@@ -328,7 +341,7 @@ function attachEvents() {
         return;
       }
 
-      await saveEncryptedSubmission(payload);
+      await saveSubmission(payload);
       downloadUnlocked = true;
       showSuccess(payload);
     } catch (error) {
@@ -450,11 +463,36 @@ function showSuccess(payload) {
   });
 }
 
+async function saveSubmission(payload) {
+  await Promise.all([saveEncryptedSubmission(payload), saveSubmissionToFirestore(payload)]);
+}
+
 async function saveEncryptedSubmission(payload) {
   const encrypted = await encrypt(payload);
   const current = loadEncryptedSubmissions();
   current.push(encrypted);
   localStorage.setItem(submissionKey, JSON.stringify(current));
+}
+
+async function saveSubmissionToFirestore(payload) {
+  if (!submissionsCollection) return;
+
+  const sanitized = {
+    nome: payload.nome,
+    email: payload.email,
+    whatsapp: payload.whatsapp,
+    perfil: payload.perfil,
+    materialId: payload.materialId || "geral",
+    createdAtIso: payload.createdAt,
+    createdAt: serverTimestamp(),
+    source: "materiais-gratuitos",
+  };
+
+  try {
+    await addDoc(submissionsCollection, sanitized);
+  } catch (error) {
+    console.error("Erro ao salvar submissão no Firestore", error);
+  }
 }
 
 function loadEncryptedSubmissions() {
@@ -469,11 +507,27 @@ function loadEncryptedSubmissions() {
 }
 
 async function exportSubmissions() {
-  const encrypted = loadEncryptedSubmissions();
-  if (!encrypted.length) {
+  if (!isAdmin) {
+    alert("Faça login como administrador para exportar os cadastros.");
+    return;
+  }
+
+  const submissions = await loadAllSubmissions();
+  if (!submissions.length) {
     alert("Nenhum cadastro para exportar.");
     return;
   }
+
+  const { blob, filename } = createExcelFromSubmissions(submissions);
+  downloadBlob(blob, filename);
+}
+
+async function loadAllSubmissions() {
+  const cloud = await loadSubmissionsFromFirestore();
+  if (cloud.length) return cloud;
+
+  const encrypted = loadEncryptedSubmissions();
+  if (!encrypted.length) return [];
 
   const decrypted = [];
   for (const item of encrypted) {
@@ -485,34 +539,92 @@ async function exportSubmissions() {
     }
   }
 
-  if (!decrypted.length) {
-    alert("Não foi possível decifrar os cadastros salvos.");
-    return;
-  }
+  return decrypted;
+}
 
+async function loadSubmissionsFromFirestore() {
+  if (!submissionsCollection) return [];
+
+  try {
+    const snapshot = await getDocs(query(submissionsCollection, orderBy("createdAt", "desc")));
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        nome: data.nome || "",
+        email: data.email || "",
+        whatsapp: data.whatsapp || "",
+        perfil: data.perfil || "",
+        materialId: data.materialId || "geral",
+        createdAt: data.createdAt?.toDate?.().toISOString?.() || data.createdAtIso || "",
+      };
+    });
+  } catch (error) {
+    console.error("Erro ao buscar formulários no Firestore", error);
+    return [];
+  }
+}
+
+function createExcelFromSubmissions(rows) {
   const header = ["Nome", "Email", "WhatsApp", "Perfil", "Material", "Data"];
-  const rows = decrypted.map((row) => [
-    row.nome,
-    row.email,
-    row.whatsapp,
-    row.perfil,
+  const excelRows = rows.map((row) => [
+    row.nome || "",
+    row.email || "",
+    row.whatsapp || "",
+    row.perfil || "",
     row.materialId || "geral",
-    row.createdAt,
+    row.createdAt || "",
   ]);
 
-  const csv = [header, ...rows]
-    .map((line) => line.map((value) => `"${(value || "").replace(/"/g, '""')}"`).join(";"))
-    .join("\n");
+  const tableHeader = `<tr>${header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join("")}</tr>`;
+  const tableBody = excelRows
+    .map((line) => `<tr>${line.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+    .join("");
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const worksheet = `
+    <table>
+      ${tableHeader}
+      ${tableBody}
+    </table>
+  `;
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Formulários</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+        <meta charset="UTF-8" />
+      </head>
+      <body>
+        ${worksheet}
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([html], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
+
+  return { blob, filename: "formularios-materiais.xls" };
+}
+
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "formularios-materiais.csv";
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(value) {
+  return (value || "")
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function triggerDownload(id) {
