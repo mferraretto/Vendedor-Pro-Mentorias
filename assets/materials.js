@@ -83,17 +83,23 @@ function loadState() {
 function loadPublicState() {
   try {
     const raw = localStorage.getItem(publishedStateKey);
-    if (!raw) return { ...defaultState, materials: [] };
-    const parsed = JSON.parse(raw);
-    return { ...defaultState, ...parsed, materials: parsed.materials || [] };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...defaultState, ...parsed, materials: parsed.materials || defaultState.materials };
+    }
+
+    return { ...defaultState, ...state, materials: state.materials || defaultState.materials };
   } catch (error) {
     console.error("Erro ao carregar estado publicado", error);
-    return { ...defaultState, materials: [] };
+    return { ...defaultState, materials: defaultState.materials };
   }
 }
 
 function getDisplayState() {
-  return isAdmin ? state : publicState;
+  if (isAdmin) return state;
+  const hasPublished = Array.isArray(publicState?.materials) && publicState.materials.length > 0;
+  if (hasPublished) return publicState;
+  return { ...defaultState, ...state, materials: state.materials || defaultState.materials };
 }
 
 function saveState() {
@@ -304,7 +310,16 @@ function showSuccess(payload) {
   const currentState = getDisplayState();
   (currentState.materials || []).forEach((material) => {
     const item = document.createElement("li");
-    item.textContent = material.title;
+    const link = document.createElement("a");
+    link.href = material.url;
+    link.textContent = `Baixar ${material.title}`;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!downloadUnlocked) return;
+      triggerDownload(material.id);
+    });
+
+    item.appendChild(link);
     successList.appendChild(item);
   });
 
