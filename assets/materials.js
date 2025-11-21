@@ -46,6 +46,7 @@ const defaultState = {
 let state = loadState();
 let selectedMaterialId = null;
 let downloadUnlocked = false;
+let isAdmin = sessionStorage.getItem("isAdmin") === "true";
 
 const materialsGrid = document.querySelector("[data-materials-grid]");
 const adminPanel = document.querySelector("[data-admin-panel]");
@@ -92,12 +93,23 @@ function renderMaterials() {
   state.materials.forEach((material) => {
     const card = document.createElement("article");
     card.className = "material-card";
+    const adminBar = isAdmin
+      ? `<div class="material-admin-bar">
+          <span class="material-admin-label">Modo administrador</span>
+          <div class="material-admin-actions">
+            <button type="button" class="btn-ghost-small" data-admin-edit="${material.id}">Editar</button>
+            <button type="button" class="btn-ghost-small danger" data-admin-delete="${material.id}">Excluir</button>
+          </div>
+        </div>`
+      : "";
+
     card.innerHTML = `
       <header class="card-header">
         <div class="card-kicker">Download liberado após cadastro</div>
         <h3 class="card-title">${material.title}</h3>
       </header>
       <p class="card-body">${material.description}</p>
+      ${adminBar}
       <div class="card-actions">
         <button class="btn-outline" type="button" data-download="${material.id}">Baixar</button>
       </div>
@@ -133,6 +145,22 @@ function attachEvents() {
   );
 
   materialsGrid?.addEventListener("click", (event) => {
+    const deleteBtn = event.target.closest("[data-admin-delete]");
+    if (deleteBtn) {
+      event.preventDefault();
+      const id = deleteBtn.getAttribute("data-admin-delete");
+      removeMaterial(id);
+      return;
+    }
+
+    const editBtn = event.target.closest("[data-admin-edit]");
+    if (editBtn) {
+      event.preventDefault();
+      const id = editBtn.getAttribute("data-admin-edit");
+      startEditMaterial(id);
+      return;
+    }
+
     const button = event.target.closest("[data-download]");
     if (!button) return;
     const id = button.getAttribute("data-download");
@@ -369,11 +397,48 @@ function toggleAdmin(show) {
   if (!adminPanel) return;
   adminPanel.hidden = !show;
   adminPanel.classList.toggle("is-visible", show);
+  isAdmin = show;
+  renderMaterials();
 }
 
 function notifyAdminState() {
   const stored = sessionStorage.getItem("isAdmin") === "true";
   toggleAdmin(stored);
+}
+
+function startEditMaterial(id) {
+  const material = state.materials.find((item) => item.id === id);
+  if (!material) return;
+
+  const title = prompt("Edite o título da planilha:", material.title);
+  if (title === null) return;
+
+  const description = prompt("Edite a descrição:", material.description);
+  if (description === null) return;
+
+  const url = prompt("Atualize o link direto:", material.url);
+  if (url === null) return;
+
+  material.title = title.trim() || material.title;
+  material.description = description.trim() || material.description;
+  material.url = url.trim() || material.url;
+
+  saveState();
+  renderMaterials();
+  renderAdmin();
+}
+
+function removeMaterial(id) {
+  const index = state.materials.findIndex((item) => item.id === id);
+  if (index === -1) return;
+
+  const shouldRemove = confirm("Excluir esta planilha? Esta ação não pode ser desfeita.");
+  if (!shouldRemove) return;
+
+  state.materials.splice(index, 1);
+  saveState();
+  renderMaterials();
+  renderAdmin();
 }
 
 async function encrypt(data) {
