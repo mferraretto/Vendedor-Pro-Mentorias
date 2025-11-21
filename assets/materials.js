@@ -368,6 +368,7 @@ function readFileAsBase64(file) {
 function toggleAdmin(show) {
   if (!adminPanel) return;
   adminPanel.hidden = !show;
+  adminPanel.classList.toggle("is-visible", show);
 }
 
 function notifyAdminState() {

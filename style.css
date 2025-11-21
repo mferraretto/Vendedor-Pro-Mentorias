@@ -1063,6 +1063,10 @@ body.modal-open {
   background: rgba(11, 11, 16, 0.9);
   border: 1px dashed rgba(212, 175, 55, 0.35);
   border-radius: 18px;
+  display: none;
+}
+
+.admin-panel.is-visible {
   display: grid;
   gap: 16px;
 }
